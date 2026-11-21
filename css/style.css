@@ -252,6 +252,14 @@ html, body {
 }
 .controls span { font-size: 10px; color: var(--muted); letter-spacing: 2px; padding-left: 1px; }
 
+.gamepad-help {
+  max-width: 640px; margin: -14px 0 24px; padding: 9px 12px;
+  border: 1px solid rgba(99, 239, 255, 0.16); background: rgba(5, 19, 27, 0.42);
+  font-size: 10px; line-height: 1.9; letter-spacing: 0.6px; color: var(--muted);
+}
+.gamepad-help b { color: var(--cyan); letter-spacing: 2px; margin-right: 12px; }
+.gamepad-help span { display: block; }
+
 .btn-primary {
   position: relative; display: inline-flex; align-items: center; gap: 22px;
   padding: 15px 38px; border: none; cursor: pointer;

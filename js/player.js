@@ -181,14 +181,15 @@
       var forward = this.tmp.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
       var right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
       var wish = new THREE.Vector3();
-      if (input.forward) wish.add(forward);
-      if (input.back) wish.sub(forward);
-      if (input.right) wish.add(right);
-      if (input.left) wish.sub(right);
+      var forwardInput = (input.forward ? 1 : 0) - (input.back ? 1 : 0) + (input.moveY || 0);
+      var rightInput = (input.right ? 1 : 0) - (input.left ? 1 : 0) + (input.moveX || 0);
+      wish.addScaledVector(forward, forwardInput).addScaledVector(right, rightInput);
 
-      var moving = wish.lengthSq() > 0.001;
-      if (moving) wish.normalize();
-      var sprinting = input.sprint && input.forward && !this.ads;
+      var wishLength = wish.length();
+      var moving = wishLength > 0.035;
+      if (wishLength > 1) wish.divideScalar(wishLength);
+      if (!moving) wish.set(0, 0, 0);
+      var sprinting = (input.sprint || input.padSprint) && (input.forward || input.moveY > 0.55) && !this.ads;
       var maxSpeed = sprinting ? this.sprintSpeed : this.speed;
       if (this.ads) maxSpeed *= 0.55;
 
@@ -200,7 +201,7 @@
         this.vel.z = G.damp(this.vel.z, 0, 16, dt);
       }
 
-      if (input.jump && this.onGround) {
+      if ((input.jump || input.padJump) && this.onGround) {
         this.vel.y = 7.3;
         this.onGround = false;
       }

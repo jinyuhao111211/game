@@ -129,6 +129,12 @@
     levelTime: 0,
     shake: 0,
     locked: false,
+    padIndex: -1,
+    padButtons: [],
+    padActive: false,
+    padFire: false,
+    padAds: false,
+    triggerDown: false,
     menuT: 0,
     errors: [],
     clearDelay: -1,
@@ -164,7 +170,8 @@
       this.clock = new THREE.Clock();
       this.input = {
         forward: false, back: false, left: false, right: false,
-        jump: false, sprint: false, fire: false
+        jump: false, sprint: false, fire: false, ads: false,
+        moveX: 0, moveY: 0, padJump: false, padSprint: false
       };
 
       this.hud = new Hud(this);
@@ -231,6 +238,11 @@
     startLevel: function () {
       this.loadLevel(this.levelIndex, false);
       G.Weapons.resetAmmo();
+      this.input.fire = false;
+      this.input.ads = false;
+      this.padFire = false;
+      this.padAds = false;
+      this.triggerDown = false;
       this.state = 'playing';
       this.hud.show();
       G.Enemies.spawnAll(this.world, this);
@@ -264,7 +276,7 @@
 
     /* ---------------- 输入 ---------------- */
     requestLock: function () {
-      if (document.pointerLockElement === this.canvas) return;
+      if (this.padActive || document.pointerLockElement === this.canvas) return;
       if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
       try {
         var p = this.canvas.requestPointerLock();
@@ -276,12 +288,105 @@
       if (document.pointerLockElement) document.exitPointerLock();
     },
 
+    syncTrigger: function () {
+      var down = this.input.fire || this.padFire;
+      if (down === this.triggerDown) return;
+      this.triggerDown = down;
+      G.Weapons.onTrigger(down);
+    },
+
+    pollGamepad: function (dt) {
+      var pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      var pad = this.padIndex >= 0 ? pads[this.padIndex] : null;
+      var i;
+      if (!pad) {
+        for (i = 0; i < pads.length; i++) {
+          if (pads[i] && pads[i].connected) { pad = pads[i]; this.padIndex = i; break; }
+        }
+      }
+
+      this.input.moveX = 0;
+      this.input.moveY = 0;
+      this.input.padJump = false;
+      this.input.padSprint = false;
+
+      if (!pad) {
+        this.padButtons = [];
+        this.padFire = false;
+        this.padAds = false;
+        this.player.ads = this.state === 'playing' && this.input.ads;
+        this.syncTrigger();
+        return;
+      }
+
+      function value(index) {
+        var b = pad.buttons[index];
+        return b ? (typeof b.value === 'number' ? b.value : (b.pressed ? 1 : 0)) : 0;
+      }
+      var now = [], active = false;
+      for (i = 0; i < pad.buttons.length; i++) {
+        now[i] = value(i) > 0.5;
+        if (value(i) > 0.25) active = true;
+      }
+      var self = this;
+      function hit(index) { return now[index] && !self.padButtons[index]; }
+
+      var lx = pad.axes[0] || 0, ly = pad.axes[1] || 0;
+      var rx = pad.axes[2] || 0, ry = pad.axes[3] || 0;
+      function deadzone(x, y, threshold) {
+        var mag = Math.hypot(x, y);
+        if (mag <= threshold) return [0, 0];
+        var scale = Math.min(1, (mag - threshold) / (1 - threshold)) / mag;
+        return [x * scale, y * scale];
+      }
+      var left = deadzone(lx, ly, 0.16), right = deadzone(rx, ry, 0.18);
+      lx = left[0]; ly = left[1]; rx = right[0]; ry = right[1];
+      if (lx || ly || rx || ry) active = true;
+      if (active) this.padActive = true;
+
+      if (this.state === 'playing') {
+        this.input.moveX = lx;
+        this.input.moveY = -ly;
+        this.input.padJump = !!now[0];
+        this.input.padSprint = !!now[10];
+        this.padAds = value(6) > 0.22;
+        this.padFire = value(7) > 0.22;
+
+        // 右摇杆平方响应，兼顾微调与快速转身
+        rx *= Math.abs(rx);
+        ry *= Math.abs(ry);
+        if (rx || ry) this.player.applyLook(rx * 1100 * dt, ry * 950 * dt);
+
+        if (hit(3)) this.player.toggleMode();
+        if (hit(4) || hit(14)) G.Weapons.prev();
+        if (hit(5) || hit(15)) G.Weapons.next();
+        if (hit(9)) this.pause();
+      } else {
+        this.padFire = false;
+        this.padAds = false;
+        if (hit(0) || hit(9)) {
+          this.padActive = true;
+          if (this.state === 'menu') $('btn-start').click();
+          else if (this.state === 'paused') $('btn-resume').click();
+          else if (this.state === 'dead') $('btn-retry').click();
+          else if (this.state === 'clear') {
+            if (this.levelIndex >= G.LEVELS.length - 1) $('btn-again').click();
+            else $('btn-next').click();
+          }
+        }
+      }
+
+      this.player.ads = this.state === 'playing' && (this.input.ads || this.padAds);
+      this.syncTrigger();
+      this.padButtons = now;
+    },
+
     bindEvents: function () {
       var self = this;
 
       document.addEventListener('pointerlockchange', function () {
         self.locked = (document.pointerLockElement === self.canvas);
-        if (!self.locked && self.state === 'playing') self.pause();
+        if (!self.locked && self.state === 'playing' && !self.padActive) self.pause();
       });
 
       document.addEventListener('pointerlockerror', function () {
@@ -294,23 +399,40 @@
       });
 
       window.addEventListener('mousedown', function (e) {
+        self.padActive = false;
         if (self.state !== 'playing') return;
         if (!self.locked) { self.requestLock(); return; }
         if (e.button === 0) {
           self.input.fire = true;
-          G.Weapons.onTrigger(true);
+          self.syncTrigger();
         } else if (e.button === 2) {
-          self.player.ads = true;
+          self.input.ads = true;
         }
       });
 
       window.addEventListener('mouseup', function (e) {
         if (e.button === 0) {
           self.input.fire = false;
-          G.Weapons.onTrigger(false);
+          self.syncTrigger();
         } else if (e.button === 2) {
-          self.player.ads = false;
+          self.input.ads = false;
         }
+      });
+
+      window.addEventListener('gamepadconnected', function (e) {
+        self.padIndex = e.gamepad.index;
+        self.padButtons = [];
+        self.toast('手柄已连接 · A 确认 / Start 暂停');
+      });
+
+      window.addEventListener('gamepaddisconnected', function (e) {
+        if (e.gamepad.index !== self.padIndex) return;
+        self.padIndex = -1;
+        self.padButtons = [];
+        self.padFire = false;
+        self.padAds = false;
+        self.syncTrigger();
+        self.toast('手柄已断开');
       });
 
       window.addEventListener('contextmenu', function (e) { e.preventDefault(); });
@@ -445,6 +567,10 @@
       if (this.state !== 'playing') return;
       this.state = 'paused';
       this.input.fire = false;
+      this.input.ads = false;
+      this.padFire = false;
+      this.padAds = false;
+      this.triggerDown = false;
       this.player.ads = false;
       G.Weapons.onTrigger(false);
       $('overlay-pause').classList.remove('hidden');
@@ -468,6 +594,10 @@
     onPlayerDeath: function () {
       this.state = 'dead';
       this.input.fire = false;
+      this.input.ads = false;
+      this.padFire = false;
+      this.padAds = false;
+      this.triggerDown = false;
       this.player.ads = false;
       G.Weapons.onTrigger(false);
       this.exitLock();
@@ -532,6 +662,7 @@
     /* ---------------- 更新 ---------------- */
     update: function (dt) {
       var i;
+      this.pollGamepad(dt);
 
       if (this.state === 'menu') {
         this.menuT += dt * 0.055;
