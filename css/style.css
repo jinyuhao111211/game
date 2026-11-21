@@ -151,6 +151,8 @@ html, body {
 .wpn-meta { min-width: 0; flex: 1; }
 .wpn-name { font-size: 12px; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wpn-ammo { font-family: Consolas, monospace; font-size: 15px; color: var(--amber); margin-top: 2px; }
+.wpn-ammo b { font-weight: 600; }
+.wpn-ammo.reloading b { color: #ff8a76; }
 .wpn-ammo span { font-family: inherit; font-size: 10px; color: var(--muted); margin-left: 6px; letter-spacing: 1px; }
 
 .hint-line {

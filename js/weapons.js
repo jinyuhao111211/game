@@ -10,12 +10,14 @@
     {
       id: 'rifle', name: 'AR-7 突击步枪', tag: '全自动',
       damage: 24, rpm: 560, pellets: 1, spread: 0.011, adsSpread: 0.0022,
-      recoil: 0.011, range: 300, adsFov: 52, auto: true, shotSound: 'rifle'
+      recoil: 0.011, range: 300, adsFov: 52, auto: true, shotSound: 'rifle',
+      magSize: 30, reloadTime: 1.2
     },
     {
       id: 'shotgun', name: 'SG-12 战术霰弹枪', tag: '泵动',
       damage: 14, rpm: 96, pellets: 9, spread: 0.075, adsSpread: 0.052,
-      recoil: 0.042, range: 95, adsFov: 60, auto: false, shotSound: 'shotgun'
+      recoil: 0.042, range: 95, adsFov: 60, auto: false, shotSound: 'shotgun',
+      magSize: 30, reloadTime: 1.2
     }
   ];
 
@@ -278,6 +280,9 @@
   G.Weapons = {
     game: null,
     index: 0,
+    ammo: [30, 30],
+    reloading: false,
+    reloadTimer: 0,
     cooldown: 0,
     trigger: false,
     firedThisPress: false,
@@ -326,12 +331,41 @@
 
     get config() { return WEAPONS[this.index]; },
 
+    resetAmmo: function () {
+      for (var i = 0; i < WEAPONS.length; i++) {
+        this.ammo[i] = WEAPONS[i].magSize;
+        if (this.game.hud) this.game.hud.setAmmo(i, this.ammo[i], 0);
+      }
+      this.reloading = false;
+      this.reloadTimer = 0;
+      this.cooldown = 0;
+      this.trigger = false;
+      this.firedThisPress = false;
+    },
+
+    updateAmmoHUD: function () {
+      if (this.game.hud) {
+        this.game.hud.setAmmo(this.index, this.ammo[this.index], this.reloading ? Math.max(0, this.reloadTimer) : 0);
+      }
+    },
+
+    startReload: function () {
+      if (this.reloading) return;
+      this.reloading = true;
+      this.reloadTimer = this.config.reloadTime;
+      this.updateAmmoHUD();
+      this.game.toast('弹匣打空 · 换弹 1.2 秒');
+      G.Audio.switchGun();
+    },
+
     equip: function (idx, silent) {
       idx = ((idx % WEAPONS.length) + WEAPONS.length) % WEAPONS.length;
       if (idx === this.index && !silent) return;
       this.index = idx;
       this.switchT = 0;
       this.cooldown = Math.max(this.cooldown, 0.22);
+      this.reloading = false;
+      this.reloadTimer = 0;
       for (var i = 0; i < this.viewmodels.length; i++) {
         this.viewmodels[i].visible = false;
         this.charGuns[i].visible = false;
@@ -340,10 +374,12 @@
       this.viewmodels[idx].visible = fps;
       this.charGuns[idx].visible = !fps;
       if (this.game.hud) this.game.hud.setWeapon(idx);
+      this.updateAmmoHUD();
       if (!silent) {
         G.Audio.switchGun();
         this.game.toast('已切换 · ' + WEAPONS[idx].name);
       }
+      if (this.ammo[idx] === 0 && this.game.state === 'playing') this.startReload();
     },
 
     next: function () { this.equip(this.index + 1); },
@@ -366,6 +402,16 @@
       var game = this.game;
       var w = WEAPONS[this.index];
       if (this.cooldown > 0) this.cooldown -= dt;
+      if (this.reloading && game.state === 'playing') {
+        this.reloadTimer = Math.max(0, this.reloadTimer - dt);
+        if (this.reloadTimer === 0) {
+          this.ammo[this.index] = w.magSize;
+          this.reloading = false;
+          this.game.toast('换弹完成');
+          G.Audio.switchGun();
+        }
+        this.updateAmmoHUD();
+      }
       if (this.flashTimer > 0) {
         this.flashTimer -= dt;
         if (this.flashTimer <= 0) {
@@ -428,8 +474,14 @@
     fire: function () {
       var game = this.game;
       var w = WEAPONS[this.index];
-      if (this.cooldown > 0 || game.state !== 'playing') return;
+      if (this.cooldown > 0 || game.state !== 'playing' || this.reloading) return;
+      if (this.ammo[this.index] <= 0) {
+        this.startReload();
+        return;
+      }
       this.cooldown = 60 / w.rpm;
+      this.ammo[this.index]--;
+      this.updateAmmoHUD();
 
       var player = game.player;
       var spread = (player.ads ? w.adsSpread : w.spread) * (1 + Math.min(Math.hypot(player.vel.x, player.vel.z) / 10, 1) * 0.8);
@@ -517,6 +569,7 @@
 
       if (anyHit) game.showHitmarker(anyHead);
       game.updateCrosshair();
+      if (this.ammo[this.index] === 0) this.startReload();
     },
 
     _spread: function (dir, spread) {

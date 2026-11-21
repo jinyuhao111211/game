@@ -436,6 +436,7 @@
         var py = p.mesh.position.y;
         if (!remove && Math.hypot(px, pz) < 0.72 && py > player.pos.y + 0.1 && py < player.pos.y + 1.95) {
           game.damagePlayer(p.dmg);
+          if (game.state !== 'playing') return;
           G.FX.spark(p.mesh.position.clone(), 0xff8a5a, 8, 4, 0.12);
           remove = true;
         }

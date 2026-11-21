@@ -28,6 +28,7 @@
     this.crosshairEl = $('crosshair');
     this.hitEl = $('hitmarker');
     this.slots = [$('slot-0'), $('slot-1')];
+    this.ammoEls = [$('ammo-0'), $('ammo-1')];
     this.flashEl = $('damage-flash');
     this.bannerEl = $('banner');
     this.toastEl = $('toast');
@@ -66,6 +67,14 @@
     for (var i = 0; i < this.slots.length; i++) {
       this.slots[i].classList.toggle('active', i === idx);
     }
+  };
+
+  Hud.prototype.setAmmo = function (idx, ammo, reloadRemaining) {
+    var el = this.ammoEls[idx];
+    if (!el) return;
+    var reloading = reloadRemaining > 0;
+    el.textContent = reloading ? '换弹 ' + reloadRemaining.toFixed(1) + 's' : ammo + ' / ∞';
+    el.parentElement.classList.toggle('reloading', reloading);
   };
 
   Hud.prototype.setViewMode = function (mode) {
@@ -221,6 +230,7 @@
 
     startLevel: function () {
       this.loadLevel(this.levelIndex, false);
+      G.Weapons.resetAmmo();
       this.state = 'playing';
       this.hud.show();
       G.Enemies.spawnAll(this.world, this);
