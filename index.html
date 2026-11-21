@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>深蓝前线 · DEEP FRONTLINE</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<!-- ======================= HUD ======================= -->
+<div id="hud" class="hidden">
+  <div class="hp-block">
+    <div class="hp-head">
+      <span class="hp-title">生命值</span>
+      <span class="hp-num" id="hp-num">100</span>
+    </div>
+    <div class="hp-track">
+      <div class="hp-fill" id="hp-fill"></div>
+      <div class="hp-ticks"></div>
+    </div>
+    <div class="hp-sub"><span class="dot"></span> 纳米修复 · <span id="hp-status">稳定</span></div>
+  </div>
+
+  <div class="mission-block">
+    <div class="mission-level" id="mission-level">第 1 关 / 5</div>
+    <div class="mission-name" id="mission-name">海岛前哨</div>
+    <div class="mission-obj">剩余敌对单位 <b id="enemy-count">0</b></div>
+  </div>
+
+  <div class="mode-block">
+    <span class="mode-label">视角</span>
+    <span class="mode-value" id="view-mode">第一人称</span>
+  </div>
+
+  <div id="crosshair">
+    <span class="ch-line ch-t"></span>
+    <span class="ch-line ch-b"></span>
+    <span class="ch-line ch-l"></span>
+    <span class="ch-line ch-r"></span>
+    <span class="ch-dot"></span>
+  </div>
+  <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
+
+  <div class="weapon-block">
+    <div class="wpn-slot active" id="slot-0">
+      <div class="wpn-key">1</div>
+      <div class="wpn-icon">
+        <svg viewBox="0 0 96 30" aria-hidden="true">
+          <path d="M5 18h12l5-7h25l4 3h20l3 3h12v4H62l-4 4H29l-5-4H5z" fill="currentColor"/>
+          <path d="M40 21h8v5h-8zM48 21h6v4h-6z" fill="currentColor" opacity=".65"/>
+        </svg>
+      </div>
+      <div class="wpn-meta">
+        <div class="wpn-name">AR-7 突击步枪</div>
+        <div class="wpn-ammo">∞ <span>全自动</span></div>
+      </div>
+    </div>
+    <div class="wpn-slot" id="slot-1">
+      <div class="wpn-key">2</div>
+      <div class="wpn-icon">
+        <svg viewBox="0 0 96 30" aria-hidden="true">
+          <path d="M3 18h16l3-6h30l3 3h20l4 3h14v4H65l-3 4H25l-4-4H3z" fill="currentColor"/>
+          <path d="M36 21h16v4H36z" fill="currentColor" opacity=".65"/>
+        </svg>
+      </div>
+      <div class="wpn-meta">
+        <div class="wpn-name">SG-12 战术霰弹枪</div>
+        <div class="wpn-ammo">∞ <span>泵动</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hint-line">滚轮 切换武器　·　V 切换视角　·　右键 精准瞄准</div>
+  <div id="damage-flash"></div>
+  <div id="banner"><div class="banner-kicker"></div><div class="banner-title"></div><div class="banner-sub"></div></div>
+  <div id="toast"></div>
+</div>
+
+<!-- ======================= START ======================= -->
+<div id="overlay-start" class="overlay">
+  <div class="start-wrap">
+    <div class="brand">
+      <div class="brand-mark">DF</div>
+      <div class="brand-text"><b>DEEP FRONTLINE</b><span>深 蓝 前 线</span></div>
+    </div>
+    <h1>五座战场<br /><em>等你肃清</em></h1>
+    <p class="lead">第一 / 第三人称双视角射击 · 无限弹药 · 双枪自由切换 · 实时反射海面</p>
+    <div class="controls">
+      <div><kbd>W A S D</kbd><span>移动</span></div>
+      <div><kbd>鼠标左键</kbd><span>射击</span></div>
+      <div><kbd>滚轮 / 1 2</kbd><span>切换枪械</span></div>
+      <div><kbd>V</kbd><span>切换视角</span></div>
+      <div><kbd>右键</kbd><span>精准瞄准</span></div>
+      <div><kbd>Shift</kbd><span>冲刺</span></div>
+      <div><kbd>空格</kbd><span>跳跃</span></div>
+      <div><kbd>ESC</kbd><span>暂停</span></div>
+    </div>
+    <button id="btn-start" class="btn-primary"><span>开始任务</span><i>›</i></button>
+    <div class="start-foot">点击后将锁定鼠标指针 · 建议使用 Chrome / Edge 全屏游玩</div>
+  </div>
+
+  <aside class="stage-list">
+    <div class="stage-list-title">作战序列 <span>5 STAGES</span></div>
+    <div class="stage-item"><b>01</b><div><strong>海岛前哨</strong><span>热带群岛 · 晴朗</span></div></div>
+    <div class="stage-item"><b>02</b><div><strong>极地残响</strong><span>冰海废墟 · 冷光</span></div></div>
+    <div class="stage-item"><b>03</b><div><strong>落日港湾</strong><span>黄昏货港 · 涨潮</span></div></div>
+    <div class="stage-item"><b>04</b><div><strong>荒漠绿洲</strong><span>峡谷水泽 · 正午</span></div></div>
+    <div class="stage-item"><b>05</b><div><strong>深渊要塞</strong><span>血色风暴 · 终极</span></div></div>
+  </aside>
+</div>
+
+<!-- ======================= PAUSE ======================= -->
+<div id="overlay-pause" class="overlay hidden">
+  <div class="panel small">
+    <div class="panel-kicker">SYSTEM HOLD</div>
+    <h2>行动已暂停</h2>
+    <p class="panel-text">鼠标已解锁。返回战场后继续清剿敌对单位。</p>
+    <div class="btn-row">
+      <button id="btn-resume" class="btn-primary"><span>继续行动</span><i>›</i></button>
+      <button id="btn-restart" class="btn-ghost">重新开始本关</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= LEVEL CLEAR ======================= -->
+<div id="overlay-clear" class="overlay hidden">
+  <div class="panel">
+    <div class="panel-kicker" id="clear-kicker">STAGE 01 CLEAR</div>
+    <h2 id="clear-title">海岛前哨 · 已肃清</h2>
+    <p class="panel-text" id="clear-sub">区域安全，下一片战场已解锁。</p>
+    <div class="stat-grid">
+      <div><span>击杀</span><b id="stat-kills">0</b></div>
+      <div><span>爆头</span><b id="stat-heads">0</b></div>
+      <div><span>命中率</span><b id="stat-acc">0%</b></div>
+      <div><span>用时</span><b id="stat-time">0:00</b></div>
+    </div>
+    <button id="btn-next" class="btn-primary"><span>进入下一关</span><i>›</i></button>
+  </div>
+</div>
+
+<!-- ======================= DEFEAT ======================= -->
+<div id="overlay-fail" class="overlay hidden">
+  <div class="panel">
+    <div class="panel-kicker danger">MISSION FAILED</div>
+    <h2>生命体征消失</h2>
+    <p class="panel-text">作战单元失去响应。纳米修复舱已准备就绪，可立即重返战场。</p>
+    <div class="btn-row">
+      <button id="btn-retry" class="btn-primary"><span>重试本关</span><i>›</i></button>
+      <button id="btn-menu" class="btn-ghost">返回主菜单</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= VICTORY ======================= -->
+<div id="overlay-win" class="overlay hidden">
+  <div class="panel">
+    <div class="panel-kicker">ALL STAGES CLEAR</div>
+    <h2>深蓝前线 · 全境肃清</h2>
+    <p class="panel-text">五座战场全部收复。你的名字将被写入舰队档案。</p>
+    <div class="stat-grid">
+      <div><span>总击杀</span><b id="win-kills">0</b></div>
+      <div><span>总爆头</span><b id="win-heads">0</b></div>
+      <div><span>总命中率</span><b id="win-acc">0%</b></div>
+      <div><span>总用时</span><b id="win-time">0:00</b></div>
+    </div>
+    <button id="btn-again" class="btn-primary"><span>再次出击</span><i>›</i></button>
+  </div>
+</div>
+
+<div id="fade"></div>
+<div id="errors"></div>
+
+<script src="lib/three.min.js"></script>
+<script src="lib/Sky.js"></script>
+<script src="lib/Reflector.js"></script>
+<script src="js/util.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/weapons.js"></script>
+<script src="js/enemies.js"></script>
+<script src="js/world.js"></script>
+<script src="js/player.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
